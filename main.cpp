@@ -6,6 +6,8 @@
 #include "main.h"
 #include "card.h"
 #include "deck.h"
+#include "player.h"
+#include "table.h"
 
 #define DEVELOPMENT
 
@@ -14,152 +16,6 @@ enum GameStates{
     GAME_IN_PROGRESS,
     GAME_END,
     GAME_MAX
-};
-
-class Player{
-    private:
-        std::string m_name;
-        std::vector<Card> hand;
-    public:
-        Player(std::string name) : m_name(name)
-        {  
-
-        }
-
-        std::string_view GetName() const
-        {
-            return m_name;
-        }
-
-        int GetPoints() const
-        {
-            int points = 0;
-            for(auto& card : hand)
-            {
-                points += card.GetPoints();
-            }
-            return points;
-        }
-
-        bool DrawCard(Deck& deck)
-        {
-            auto card = deck.Deal();
-            if(card.has_value())
-            {
-                hand.emplace_back(*card);
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        void ReturnWrongCardIntoHand(Card& card)
-        {
-            std::cout << "Cannot place this card on the table!\n\n";
-            hand.emplace_back(card);
-        }
-
-        std::optional<Card> PlayCard(Deck& deck, bool& isDeckEmpty)
-        {
-            std::string input;
-            int num = 0;
-
-            do
-            {
-                std::cout << "Player " << m_name << " has to choose card to play or draw from deck\n";
-                std::cout << "Enter certain number to play or enter SPACE to draw\n";
-                std::getline(std::cin, input);
-                if(input == " ")
-                {
-                    std::cout << "Player " << m_name << " draw card from deck\n";
-                    if(true == DrawCard(deck))
-                    {
-                        isDeckEmpty = false;
-                    }
-                    else
-                    {
-                        isDeckEmpty = true;
-                    }
-                    return std::nullopt;
-                }
-                if (input.empty() || !std::all_of(input.begin(), input.end(), [](char c){return std::isdigit(c);}))
-                {
-                    std::cout << "\nPlease enter a valid number of card!\n\n";
-                    continue;
-                }
-                num = std::stoi(input);
-                if(num > 0 && num <= GetNumberOfCardsInHand())
-                {
-                    std::cout << "Player " << m_name << " plays " << hand[num-1] << "\n";
-                    num = std::stoi(input);
-                    Card retCard(hand[num-1]);
-                    hand.erase(hand.begin() + num - 1);
-                    return retCard;
-                }
-            } while (true);
-        }
-
-        friend std::ostream& operator<<(std::ostream& out, const Player& player)
-        {
-            out << player.m_name;
-            return out;
-        }
-
-        void DisplayHand()
-        {
-            int cardNumber = 1;
-            std::cout << "Player " << m_name << " has in hands " << hand.size() << " cards: \n";
-            for(auto& element : hand)
-            {
-                std::cout << cardNumber << ": " << element;
-                cardNumber++;
-            }
-        }
-
-        int GetNumberOfCardsInHand() const
-        {
-            return hand.size();
-        }
-
-};
-
-class Table{
-    private:
-        std::vector<Card> stack;
-    public:
-        Table()
-        {
-
-        }
-        void PlaceCardOnTable(Card card)
-        {
-            stack.emplace_back(card);
-        }
-        Card WhatIsOnTopOfTheTableStack() const
-        {
-            return stack.back();
-        }
-        int GetNumOfCardsOnTable() const
-        {
-            return stack.size();
-        }
-        friend std::ostream& operator<<(std::ostream& out, const Table& table)
-        {
-            out << "The top card on the table is: \n" << table.stack.back() << '\n';
-            return out;
-        }
-        std::vector<Card> GetAllCardsBelowTopFromStack()
-        {
-            std::vector<Card> retStack;
-            for(int i = 0; i < stack.size() - 1; i++)
-            {
-                retStack.emplace_back(stack[i]);
-            }
-            stack.erase(stack.begin(), stack.end() - 1);
-            return retStack;
-        }
 };
 
 class Game{
@@ -347,6 +203,11 @@ class Game{
             state = GAME_IN_PROGRESS;
         }
 
+        void SetState(GameStates newState)
+        {
+            state = newState;
+        }
+
         void PutCardsFromTableToDeckAndReshuffle()
         {
             deck.GetCardsFromStackBackToDeck(table.GetAllCardsBelowTopFromStack());
@@ -408,12 +269,6 @@ class Game{
                     state = GAME_END;
                 }
             }
-
-            //TODO: to be removed
-            // players[0].DisplayHand();
-            // players[1].DisplayHand();
-            // std::cout << "number of cards in deck " << deck.GetNumOfCardsLeft() << '\n';
-            // std::cout << table;
         }
 
         void EndGame()
@@ -440,7 +295,8 @@ class Game{
             }
             else if(input == "n" || input == "N")
             {
-                //TODO: make it work
+                system("start main.exe");
+                std::exit(0);
                 state = GAME_START;
             }
             else
