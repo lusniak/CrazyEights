@@ -14,6 +14,7 @@ class Deck{
         Deck();
         void Display(void) const;
         void Shuffle(void);
-        Card Deal(void);
+        std::optional<Card> Deal(void);
         int GetNumOfCardsLeft(void) const;
+        void GetCardsFromStackBackToDeck(std::vector<Card> stack);
 };

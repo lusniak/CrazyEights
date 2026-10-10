@@ -41,9 +41,18 @@ class Player{
             return points;
         }
 
-        void DrawCard(Deck& deck)
+        bool DrawCard(Deck& deck)
         {
-            hand.emplace_back(deck.Deal());
+            auto card = deck.Deal();
+            if(card.has_value())
+            {
+                hand.emplace_back(*card);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         void ReturnWrongCardIntoHand(Card& card)
@@ -52,7 +61,7 @@ class Player{
             hand.emplace_back(card);
         }
 
-        std::optional<Card> PlayCard(Deck& deck)
+        std::optional<Card> PlayCard(Deck& deck, bool& isDeckEmpty)
         {
             std::string input;
             int num = 0;
@@ -65,7 +74,14 @@ class Player{
                 if(input == " ")
                 {
                     std::cout << "Player " << m_name << " draw card from deck\n";
-                    DrawCard(deck);
+                    if(true == DrawCard(deck))
+                    {
+                        isDeckEmpty = false;
+                    }
+                    else
+                    {
+                        isDeckEmpty = true;
+                    }
                     return std::nullopt;
                 }
                 if (input.empty() || !std::all_of(input.begin(), input.end(), [](char c){return std::isdigit(c);}))
@@ -125,10 +141,24 @@ class Table{
         {
             return stack.back();
         }
+        int GetNumOfCardsOnTable() const
+        {
+            return stack.size();
+        }
         friend std::ostream& operator<<(std::ostream& out, const Table& table)
         {
             out << "The top card on the table is: \n" << table.stack.back() << '\n';
             return out;
+        }
+        std::vector<Card> GetAllCardsBelowTopFromStack()
+        {
+            std::vector<Card> retStack;
+            for(int i = 0; i < stack.size() - 1; i++)
+            {
+                retStack.emplace_back(stack[i]);
+            }
+            stack.erase(stack.begin(), stack.end() - 1);
+            return retStack;
         }
 };
 
@@ -215,16 +245,80 @@ class Game{
                 }
             }
 
-            table.PlaceCardOnTable(deck.Deal());
+            table.PlaceCardOnTable(*deck.Deal());
         }
 
         bool ValidateCardAgainstTable(Card& card)
         {
+            static Card virtualEight(RANK_MAX, SUIT_MAX);
+            static bool isVirtual = false;
+            int num;
+            std::string input;
             bool retVal = false;
             Card topStackCard(table.WhatIsOnTopOfTheTableStack());
             if(card.GetRank() == RANK_8)
             {
-                retVal = true;
+                do
+                {
+                    std::cout << "Choose suit: \n";
+                    std::cout << "1: HEARS\n";
+                    std::cout << "2: DIAMONDS\n";
+                    std::cout << "3: CLUBS\n";
+                    std::cout << "4: SPADES\n";
+                    std::getline(std::cin, input);
+                    if (input.empty() || !std::all_of(input.begin(), input.end(), [](char c){return std::isdigit(c);}))
+                    {
+                        std::cout << "\nPlease enter a valid number of suit!\n\n";
+                        continue;
+                    }
+                    else
+                    {
+                        num = std::stoi(input);
+                        if(num > 0 && num < 5)
+                        {
+                            switch(num)
+                            {
+                                case 1:
+                                    virtualEight = Card(RANK_8, SUIT_HEART);
+                                    isVirtual = true;
+                                    break;
+                                case 2:
+                                    virtualEight = Card(RANK_8, SUIT_DIAMOND);
+                                    isVirtual = true;
+                                    break;
+                                case 3:
+                                    virtualEight = Card(RANK_8, SUIT_CLUB);
+                                    isVirtual = true;
+                                    break;
+                                case 4:
+                                    virtualEight = Card(RANK_8, SUIT_SPADE);
+                                    isVirtual = true;
+                                    break;
+                                default:
+                                    /* Do nothing */
+                                    break;
+                            }
+                            std::cout << "\nPlayer demands " << virtualEight.GetSuit() << "!\n";
+                            retVal = true;
+                            break;
+                        }
+                        else
+                        {
+                            std::cout << "\nPlease enter a valid number of suit!\n\n";
+                            continue;
+                        }
+                    }
+                }
+                while(true);
+            }
+            else if(isVirtual)
+            {
+                if(card.GetSuit() == virtualEight.GetSuit())
+                {
+                    /* Played card suit matches suit choosen by previous player */
+                    isVirtual = false;
+                    retVal = true;
+                }
             }
             else if((card.GetRank() == topStackCard.GetRank()) || (card.GetSuit() == topStackCard.GetSuit()))
             {
@@ -250,9 +344,13 @@ class Game{
             DealCards();
             std::cout << "number of cards in deck " << deck.GetNumOfCardsLeft() << '\n';
             std::cout << table;
-            players[0].DisplayHand();
-            players[1].DisplayHand();
             state = GAME_IN_PROGRESS;
+        }
+
+        void PutCardsFromTableToDeckAndReshuffle()
+        {
+            deck.GetCardsFromStackBackToDeck(table.GetAllCardsBelowTopFromStack());
+            deck.Shuffle();
         }
 
         GameStates GetGameState() const
@@ -266,7 +364,24 @@ class Game{
             {
                 do
                 {
-                    auto card = player.PlayCard(deck);
+                    player.DisplayHand();
+                    std::cout << table;
+                    bool isDeckEmpty = false;
+                    auto card = player.PlayCard(deck, isDeckEmpty);
+                    if(isDeckEmpty == true)
+                    {
+                        if((deck.GetNumOfCardsLeft() == 0) && (table.GetNumOfCardsOnTable() < 1))
+                        {
+                            /* All cards in players hands, end the game */
+                            state = GAME_END;
+                            return;
+                        }
+                        else
+                        {
+                            PutCardsFromTableToDeckAndReshuffle();
+                        }
+                        card = player.PlayCard(deck, isDeckEmpty);
+                    }
                     if(card.has_value())
                     {
                         if(ValidateCardAgainstTable(*card))
@@ -278,6 +393,11 @@ class Game{
                         {
                             player.ReturnWrongCardIntoHand(*card);
                         }
+                    }
+                    else
+                    {
+                        /* Player draw a card */
+                        break;
                     }   
                 } while (1);            
             }
@@ -289,10 +409,11 @@ class Game{
                 }
             }
 
-            players[0].DisplayHand();
-            players[1].DisplayHand();
-            std::cout << "number of cards in deck " << deck.GetNumOfCardsLeft() << '\n';
-            std::cout << table;
+            //TODO: to be removed
+            // players[0].DisplayHand();
+            // players[1].DisplayHand();
+            // std::cout << "number of cards in deck " << deck.GetNumOfCardsLeft() << '\n';
+            // std::cout << table;
         }
 
         void EndGame()
@@ -319,6 +440,7 @@ class Game{
             }
             else if(input == "n" || input == "N")
             {
+                //TODO: make it work
                 state = GAME_START;
             }
             else
@@ -335,6 +457,8 @@ int main()
     {
         switch(game.GetGameState())
         {
+            case GAME_START:
+                break;
             case GAME_IN_PROGRESS:
                 game.PlayRound();
                 break;

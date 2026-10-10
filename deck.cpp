@@ -1,3 +1,4 @@
+#include <optional>
 #include "deck.h"
 
 Deck::Deck()
@@ -27,15 +28,27 @@ void Deck::Shuffle(void)
     std::shuffle(deck.begin(), deck.end(), gen);
 }
 
-Card Deck::Deal(void)
+std::optional<Card> Deck::Deal(void)
 {
-    Card card(RANK_MAX, SUIT_MAX);
-    card = deck.back();
-    deck.pop_back();
-    return card;
+    if(deck.size() > 0)
+    {
+        Card card = deck.back();
+        deck.pop_back();
+        return card;
+    }
+    else
+    {
+        return std::nullopt;
+    }
+    
 }
 
 int Deck::GetNumOfCardsLeft(void) const
 {
     return deck.size();
+}
+
+void Deck::GetCardsFromStackBackToDeck(std::vector<Card> stack)
+{
+    deck.insert(deck.end(), stack.begin(), stack.end());
 }
